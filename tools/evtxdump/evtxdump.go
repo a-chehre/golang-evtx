@@ -29,6 +29,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/pprof"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -36,6 +38,11 @@ import (
 	"github.com/0xrawsec/golang-evtx/output"
 	"github.com/0xrawsec/golang-utils/args"
 	"github.com/0xrawsec/golang-utils/log"
+)
+
+const (
+	Version  = "1.0"
+	CommitID = "Amin"
 )
 
 const (
@@ -69,6 +76,7 @@ var (
 	start, stop   args.DateVar
 	chunkHeaderRE = regexp.MustCompile(evtx.ChunkMagic)
 	defaultTime   = time.Time{}
+	eventIds      []int64
 )
 
 //////////////////////////// stat structure ////////////////////////////////////
@@ -194,6 +202,20 @@ func carveFile(datafile string, offset int64, limit int) {
 // small routine that prints the EVTX event
 func printEvent(e *evtx.GoEvtxMap) {
 	if e != nil {
+		if eventIds != nil {
+			var a int64
+			id := e.EventID()
+			for _, a = range eventIds {
+				if a == id {
+					break
+				}
+			}
+
+			if a != id {
+				return
+			}
+		}
+
 		t, err := e.GetTime(&evtx.SystemTimePath)
 
 		// If not between start and stop we do not print
@@ -226,14 +248,13 @@ func printEvent(e *evtx.GoEvtxMap) {
 		} else {
 			fmt.Printf("%s\n", string(evtx.ToJSON(e)))
 		}
-
 	}
 }
 
 ///////////////////////////////// Main /////////////////////////////////////////
 
 func main() {
-	var memprofile, cpuprofile string
+	var memprofile, cpuprofile, eventids string
 	flag.BoolVar(&debug, "d", debug, "Enable debug mode")
 	flag.BoolVar(&header, "H", header, "Display file header and quit")
 	flag.BoolVar(&carve, "c", carve, "Carve events from file")
@@ -256,6 +277,8 @@ func main() {
 	flag.StringVar(&topic, "topic", "", "Kafka topic")
 	flag.StringVar(&cID, "cID", "", "Kafka client ID")
 	flag.StringVar(&tag, "tag", "", "special tag for matching purpose on remote collector")
+
+	flag.StringVar(&eventids, "e", "", "Comma seperated event IDs")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "%s (commit: %s)\n%s\n%s\n\n", Version, CommitID, Copyright, License)
@@ -338,6 +361,14 @@ func main() {
 			log.Errorf("Can't init Kafka conn", err)
 		}
 		out = kafkaOut
+	}
+
+	if eventids != "" {
+		for _, i := range strings.Split(eventids, ",") {
+			if a, err := strconv.ParseInt(i, 10, 64); err == nil {
+				eventIds = append(eventIds, a)
+			}
+		}
 	}
 
 	for _, evtxFile := range flag.Args() {
