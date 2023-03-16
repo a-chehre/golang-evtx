@@ -23,6 +23,7 @@ var (
 )
 
 //////////////////////// Global Variables and their setters /////////////////////
+
 var (
 	// Debug mode for parser
 	Debug = false
@@ -157,4 +158,5 @@ var (
 	EventRecordIDPath = Path("/Event/System/EventRecordID")
 	SystemTimePath    = Path("/Event/System/TimeCreated/SystemTime")
 	UserIDPath        = Path("/Event/System/Security/UserID")
+	UsernamePath      = Path("/Event/EventData/SubjectUserName")
 )

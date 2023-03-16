@@ -77,6 +77,7 @@ var (
 	chunkHeaderRE = regexp.MustCompile(evtx.ChunkMagic)
 	defaultTime   = time.Time{}
 	eventIds      []int64
+	usernames     []string
 )
 
 //////////////////////////// stat structure ////////////////////////////////////
@@ -216,6 +217,15 @@ func printEvent(e *evtx.GoEvtxMap) {
 			}
 		}
 
+		if usernames != nil {
+			un := strings.ToLower(e.Username())
+			for _, a := range usernames {
+				if a == un {
+					return
+				}
+			}
+		}
+
 		t, err := e.GetTime(&evtx.SystemTimePath)
 
 		// If not between start and stop we do not print
@@ -254,7 +264,7 @@ func printEvent(e *evtx.GoEvtxMap) {
 ///////////////////////////////// Main /////////////////////////////////////////
 
 func main() {
-	var memprofile, cpuprofile, eventids string
+	var memprofile, cpuprofile, eventids, users string
 	flag.BoolVar(&debug, "d", debug, "Enable debug mode")
 	flag.BoolVar(&header, "H", header, "Display file header and quit")
 	flag.BoolVar(&carve, "c", carve, "Carve events from file")
@@ -278,7 +288,8 @@ func main() {
 	flag.StringVar(&cID, "cID", "", "Kafka client ID")
 	flag.StringVar(&tag, "tag", "", "special tag for matching purpose on remote collector")
 
-	flag.StringVar(&eventids, "e", "", "Comma seperated event IDs")
+	flag.StringVar(&eventids, "e", "", "Comma separated event IDs")
+	flag.StringVar(&users, "eu", "", "Comma separated usernames to exclude")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "%s (commit: %s)\n%s\n%s\n\n", Version, CommitID, Copyright, License)
@@ -368,6 +379,12 @@ func main() {
 			if a, err := strconv.ParseInt(i, 10, 64); err == nil {
 				eventIds = append(eventIds, a)
 			}
+		}
+	}
+
+	if users != "" {
+		for _, i := range strings.Split(users, ",") {
+			usernames = append(usernames, strings.ToLower(i))
 		}
 	}
 
