@@ -103,6 +103,13 @@ Usage of evtxdump: evtxdump [OPTIONS] FILES...
   -u	Does not care about ordering the events before printing (faster for large files)
 ```
 
+By default, PowerShell uses the legacy encoding (ASCII), which can cause issues with non-English characters and symbols. to change the terminal encoding to UTF-8,
+please use the following two commands:
+```
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$PSDefaultParameterValues = @{ '*:Encoding' = 'utf8' }
+```
+
 ### docker version evtxdump
 
 ```
