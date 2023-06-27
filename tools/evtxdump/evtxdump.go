@@ -76,8 +76,9 @@ var (
 	start, stop   args.DateVar
 	chunkHeaderRE = regexp.MustCompile(evtx.ChunkMagic)
 	defaultTime   = time.Time{}
-	eventIds      []int64
-	usernames     []string
+	eventIds      map[int64]bool
+	usernames     map[string]bool
+	fields        map[string]bool
 )
 
 //////////////////////////// stat structure ////////////////////////////////////
@@ -200,30 +201,37 @@ func carveFile(datafile string, offset int64, limit int) {
 	}
 }
 
+func deleteUnwantedFields(m *evtx.GoEvtxMap) {
+	for key, elm := range *m {
+		switch elm.(type) {
+		case evtx.GoEvtxMap:
+			emap := elm.(evtx.GoEvtxMap)
+			if len(emap) == 0 {
+				delete(*m, key)
+			} else {
+				deleteUnwantedFields(&emap)
+				if len(emap) == 0 {
+					delete(*m, key)
+				}
+			}
+		default:
+			if !fields[strings.ToLower(key)] {
+				delete(*m, key)
+			}
+			break
+		}
+	}
+}
+
 // small routine that prints the EVTX event
 func printEvent(e *evtx.GoEvtxMap) {
 	if e != nil {
-		if eventIds != nil {
-			var a int64
-			id := e.EventID()
-			for _, a = range eventIds {
-				if a == id {
-					break
-				}
-			}
-
-			if a != id {
-				return
-			}
+		if eventIds != nil && !eventIds[e.EventID()] {
+			return
 		}
 
-		if usernames != nil {
-			un := strings.ToLower(e.Username())
-			for _, a := range usernames {
-				if a == un {
-					return
-				}
-			}
+		if usernames != nil && usernames[strings.ToLower(e.Username())] {
+			return
 		}
 
 		t, err := e.GetTime(&evtx.SystemTimePath)
@@ -249,6 +257,10 @@ func printEvent(e *evtx.GoEvtxMap) {
 			}
 		}
 
+		if fields != nil {
+			deleteUnwantedFields(e)
+		}
+
 		if timestamp {
 			if err == nil {
 				fmt.Printf("%d: %s\n", t.UnixNano(), string(evtx.ToJSON(e)))
@@ -264,7 +276,7 @@ func printEvent(e *evtx.GoEvtxMap) {
 ///////////////////////////////// Main /////////////////////////////////////////
 
 func main() {
-	var memprofile, cpuprofile, eventids, users string
+	var memprofile, cpuprofile, eventids, users, field string
 	flag.BoolVar(&debug, "d", debug, "Enable debug mode")
 	flag.BoolVar(&header, "H", header, "Display file header and quit")
 	flag.BoolVar(&carve, "c", carve, "Carve events from file")
@@ -288,8 +300,9 @@ func main() {
 	flag.StringVar(&cID, "cID", "", "Kafka client ID")
 	flag.StringVar(&tag, "tag", "", "special tag for matching purpose on remote collector")
 
-	flag.StringVar(&eventids, "e", "", "Comma separated event IDs")
+	flag.StringVar(&eventids, "ie", "", "Comma separated event IDs to include")
 	flag.StringVar(&users, "eu", "", "Comma separated usernames to exclude")
+	flag.StringVar(&field, "if", "", "Comma separated fields to include")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "%s (commit: %s)\n%s\n%s\n\n", Version, CommitID, Copyright, License)
@@ -375,16 +388,25 @@ func main() {
 	}
 
 	if eventids != "" {
+		eventIds = make(map[int64]bool)
 		for _, i := range strings.Split(eventids, ",") {
 			if a, err := strconv.ParseInt(i, 10, 64); err == nil {
-				eventIds = append(eventIds, a)
+				eventIds[a] = true
 			}
 		}
 	}
 
 	if users != "" {
+		usernames = make(map[string]bool)
 		for _, i := range strings.Split(users, ",") {
-			usernames = append(usernames, strings.ToLower(i))
+			usernames[strings.ToLower(i)] = true
+		}
+	}
+
+	if field != "" {
+		fields = make(map[string]bool)
+		for _, i := range strings.Split(field, ",") {
+			fields[strings.ToLower(i)] = true
 		}
 	}
 
