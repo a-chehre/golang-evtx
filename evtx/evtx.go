@@ -399,8 +399,8 @@ func (ef *File) FastEvents() (cgem chan *GoEvtxMap) {
 			for pc := range ef.Chunks() {
 				cpc, err := ef.FetchChunk(pc.Offset)
 				switch {
-				case err != nil && err != io.EOF:
-					panic(err)
+				/*case err != nil && err != io.EOF:
+				panic(err)*/
 				case err == nil:
 					ev := cpc.Events()
 					chanQueue <- ev
